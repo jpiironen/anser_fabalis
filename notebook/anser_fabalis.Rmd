@@ -1,0 +1,401 @@
+---
+title: "Case study on migration of _Anser Fabalis_"
+date: "`r Sys.Date()`"
+#bibliography: ../references.bib
+link-citations: yes
+linkcolor: blue
+output: 
+  rmarkdown::html_document:
+    toc: TRUE
+    toc_depth: 3
+    number_sections: TRUE
+    toc_float:
+      smooth_scroll: TRUE
+vignette: >
+  %\VignetteIndexEntry{quickstart}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  #collapse = TRUE,
+  fig.width = 6,
+  fig.height = 4,
+  fig.retina = 8
+#  #comment = "#>"
+)
+```
+
+
+
+# Overview
+
+This notebook contains supplementary material for the paper 
+
+_Predicting spatio-temporal distributions of migratory populations by combining citizen science data and Gaussian Process modelling (2020). Antti Piironen, Juho Piironen and Toni Laaksonen._ 
+
+
+
+# Load the data
+
+First load the required R-packages
+```{r, results='hide', message=F}
+library(chron)
+library(rprojroot)
+library(gplite)
+library(ggplot2)
+library(ggspatial)
+library(maps)
+ROOT <- rprojroot::find_root('.gitignore')
+source(file.path(ROOT, 'scripts/subplot.R'))
+```
+
+
+
+Define a few auxiliary variables and functions.
+
+```{r}
+# these variables will define time ranges that are used to select data
+# that are representative about the autumn and spring migrations
+SPRING <- list(
+  # note: year does not matter here
+  start = chron('1.3.2000', format='d.m.y'),
+  end = chron('31.5.2000', format='d.m.y')
+)
+AUTUMN <- list(
+  # note: year does not matter here
+  start = chron('1.8.2000', format='d.m.y'),
+  end = chron('30.11.2000', format='d.m.y')
+)
+
+within_interval <- function(date, start=NULL, end=NULL, ignore_year=TRUE) {
+  if (ignore_year) {
+    year <- 2000 # just some year, does not matter which
+    mdy <- chron::month.day.year(date)
+    date <- chron(paste(mdy$day, mdy$month, year, sep='.'), format='d.m.y')
+    mdy <- chron::month.day.year(start)
+    start <- chron(paste(mdy$day, mdy$month, year, sep='.'), format='d.m.y')
+    mdy <- chron::month.day.year(end)
+    end <- chron(paste(mdy$day, mdy$month, year, sep='.'), format='d.m.y')
+    return(date >= start & date <= end)
+  } 
+  return(date >= start & date <= end)
+}
+```
+
+
+This will load the data. Here variable `SEASON` will choose which season is being analyzed (it should be either `'autumn'` or `'spring'`).
+```{r}
+# load the data
+SEASON <- 'autumn' # 'spring' or 'autumn'
+filename <- 'anser_fabalis_2011-2019.csv'
+dat <- read.csv(file.path(ROOT, 'data/', filename), sep = ',', header=T)
+dat$date <- chron(as.character(dat$date), format='d.m.y')
+
+
+# filter only observations that fit the defined spring or autumn days
+rows <- sapply(dat$date, function(date) {
+  if (SEASON=='spring')
+    return(within_interval(date, SPRING$start, SPRING$end))
+  else if (SEASON=='autumn')
+    return(within_interval(date, AUTUMN$start, AUTUMN$end))
+  else
+    stop('Unknown season: ', SEASON)
+})
+dat <- dat[rows,]
+dat <- dat[order(dat$date),]
+
+
+# target variable
+n <- dat$fabalis + dat$rossicus
+y <- dat$fabalis
+
+# predictor variables (input)
+time <- as.numeric(as.times(dat$date)) # count only days
+input <- as.data.frame(cbind(time, dat$x, dat$y))
+colnames(input) <- c('time','x1','x2')
+```
+
+
+# Fit the model
+
+The code below will specify the model structure. Here we use initial guesses for the hyperparameters that are relatively close to the optimal ones, in order to make the optimization faster. In practice, the optimization should converge also with less accurate initialization, but will take longer time. (Notice though, that it is possible that with a very bad initialization the optimization will not converge, or it converges to some suboptimal local minimum).
+```{r}
+cf_spatial <- cf_nn(
+  c('x1','x2'), 
+  magn = 3.7,
+  sigma0 = 4,
+  sigma = 3.5,
+  prior_sigma0 = prior_half_t(1),
+  prior_sigma = prior_half_t(1)
+) 
+cf_temp1 <- cf_periodic(
+  'time', 
+  period = 365, 
+  prior_period = prior_fixed(),
+  cf_base = cf_nn(
+    magn = 1, 
+    sigma0 = 0.5,
+    sigma = 5.5,
+    prior_magn = prior_fixed(),
+    prior_sigma0 = prior_half_t(1),
+    prior_sigma = prior_half_t(1)
+  )
+)
+cf_temp2 <- cf_sexp('time', lscale=290, magn=1, prior_magn = prior_fixed())
+cf_temporal <- cf_temp1 * cf_temp2
+cfs <- cf_spatial * cf_temporal
+gp <- gp_init(
+  cfs, 
+  lik = lik_betabinom(phi=5.5), 
+  method = method_fitc(num_inducing=200, bin_along='time', bin_count=9),
+  approx = approx_laplace()
+)
+```
+
+
+Optimize the hyperparameters. If you would like to actually run this part (will take some time), set the flag `fit_model = TRUE`. The model fitting is disabled by default to make this notebook compile fast. For plotting the results, we load a prefitted model by default.
+Note: if the program gives a warning that the optimization has not converged, you can simply run this cell again (if will start the optimization from were it ended up previous time).
+```{r, eval=F}
+fit_model <- F
+if (fit_model) {
+  gp <- gp_optim(gp, input, y, trials=n, tol=1e-6)
+}
+```
+
+Save the model
+```{r, eval=F}
+if (fit_model) {
+  path <- file.path(ROOT, sprintf('notebook/models/%s', SEASON))
+  if (!dir.exists(path)) {
+    dir.create(path, recursive = T)
+  }
+  filename <- file.path(path, 'gp_la_m=200.rda')
+  gp_save(gp, filename)
+}
+```
+
+
+
+
+
+
+
+
+
+# Visualise the model fit
+
+
+Load the fitted model
+```{r}
+path <- file.path(ROOT, sprintf('notebook/models/%s', SEASON))
+filename <- file.path(path, 'gp_la_m=200.rda')
+gp <- gp_load(filename)
+```
+
+
+
+```{r}
+
+save_plot <- T
+
+if (save_plot) {
+  # create directory for the plots if not existing yet
+  path <- file.path(ROOT, sprintf('notebook/plots/%s', SEASON))
+  if (!dir.exists(path)) {
+    dir.create(path, recursive = T)
+  }
+}
+
+ng <- 25 
+x1min <- 19.18 
+x1max <- 31.36 
+x2min <- 59.23 
+x2max <- 69.87 
+
+
+FLAG_AVERAGE_YEAR <- 0
+years_all <- c(seq(2011, 2019), FLAG_AVERAGE_YEAR)
+years_to_plot <- c(seq(2011, 2019, by=2), FLAG_AVERAGE_YEAR)
+if (SEASON == 'spring') {
+  dates_to_plot <- c('1.3.', '15.3.', '1.4.', '15.4.', '1.5.', '15.5.', '30.5.')
+} else {
+  dates_to_plot <- c('15.8.', '1.9.', '15.9.', '1.10.', '15.10.', '1.11.', '15.11.')
+}
+year_with_north_arrow <- FLAG_AVERAGE_YEAR
+time_tol <- 8
+
+plots_all <- list()
+pr_all <- lapply(seq_along(dates_to_plot), function(i) c())
+plot_index <- 1
+
+
+for (year in years_all) {
+  
+  average_plot <- ifelse(year == FLAG_AVERAGE_YEAR, T, F)
+
+  for (index in seq_along(dates_to_plot)) {
+    
+    date_middle <- chron(paste0(dates_to_plot[index], year), format = 'd.m.y')
+    time <- as.numeric(as.times(date_middle))
+    
+    # create (x1,x2)-grid
+    x1g <- seq(x1min, x1max, len=ng)
+    x2g <- seq(x2min, x2max, len=ng)
+    inputnew <- cbind(time, rep(x1g,each=ng), rep(x2g,ng) )
+    colnames(inputnew) <- colnames(input)
+    
+    if (average_plot) {
+      
+      pr <- pr_all[[index]]
+      signif_threshold <- 0.95 # significance level
+      signif <- pmax(rowMeans(pr > 0.5), rowMeans(pr < 0.5))
+      pr <- rowMeans(pr)
+      
+    } else {
+      
+      pr <- gp_draw(gp, inputnew, draws=1000)
+      pr_all[[index]] <- cbind(pr_all[[index]], pr)
+      signif_threshold <- 0.95 # significance level
+      signif <- pmax(rowMeans(pr > 0.5), rowMeans(pr < 0.5))
+      
+      # compute the mean surface
+      pred <- gp_pred(gp, inputnew, transform=T)
+      pr <- pred$mean
+      
+      # select which observations to plot
+      obs_ind <- input[,'time'] >= time-time_tol & input[,'time'] <= time+time_tol
+      obs_to_plot <- data.frame(x=input[obs_ind,'x1'], y=input[obs_ind,'x2'])
+    }
+    
+    
+    
+    # create map data 
+    mapdat <- map_data('world', regions = 'finland')
+    
+    
+    pp <- ggplot()
+    
+    # where the probability is significantly different from 0.5
+    pp <- pp + geom_contour_filled(
+      data=data.frame(x=inputnew[,'x1'], y=inputnew[,'x2'], signif=signif),
+      aes(x=x, y=y, z=signif),
+      breaks=c(0.0, signif_threshold, 1.01), 
+      alpha=0.2
+    )
+    pp <- pp + scale_fill_grey(start=1.0, end=0.5, guide='none')
+    
+    # map of finland
+    pp <- pp + geom_polygon(data = mapdat, aes(x=long, y = lat, group = group), 
+                            fill=NA, color='black', size=0.3)
+    # observations
+    if (!average_plot)
+      pp <- pp + geom_point(data=obs_to_plot,
+                            aes(x=x,y=y), color=(y[obs_ind]/n[obs_ind]>0.5)+2, 
+                            size=1, alpha=0.5, shape=16)
+    
+    # prediction contours
+    pp <- pp + stat_contour(data=data.frame(x=inputnew[,'x1'], y=inputnew[,'x2'], pr=pr),
+                            aes(x=x, y=y, z=pr, colour=..level..), 
+                            breaks=seq(0.1,0.9,len=7), size=0.3 )
+    # boundary, where probability = 0.5
+    pp <- pp + stat_contour(data=data.frame(x=inputnew[,'x1'], y=inputnew[,'x2'], pr=pr),
+                            aes(x=x, y=y, z=pr, colour=..level..), breaks=0.5,
+                            color='black', linetype=2, size=0.6 )
+    pp <- pp + scale_colour_gradient(limits=c(0.1,0.9), low = "red", high = "green", guide='none')
+    
+    
+    # adjust theme, xy-limits etc.
+    pp <- pp + theme_classic() 
+    pp <- pp + coord_sf(crs="WGS84") 
+    pp <- pp + 
+      scale_x_continuous(breaks = c(20,25,30)) +
+      scale_y_continuous(breaks = c(60,65,70))
+    
+    if ( (index == 1) && year == year_with_north_arrow  ) {
+      pp <- pp + annotation_north_arrow(
+        location = "bl", 
+        which_north = "true",
+        pad_x = unit(0.1, "npc"), 
+        pad_y = unit(0.5, "npc"),
+        height = unit(0.2, "npc"),
+        width = unit(0.2, "npc"),
+        style = north_arrow_fancy_orienteering
+      )
+      pp <- pp + theme(
+        axis.line = element_blank(), 
+        axis.title = element_blank()
+      )
+    } else {
+      pp <- pp + theme(
+        axis.line = element_blank(), 
+        axis.ticks = element_blank(), 
+        axis.text = element_blank(),
+        axis.title = element_blank()
+      )
+    }
+    
+    # append
+    if (year %in% years_to_plot) {
+      plots_all[[plot_index]] <- pp
+      plot_index <- plot_index + 1
+    }
+  }
+}
+
+if (FLAG_AVERAGE_YEAR %in% years_to_plot) {
+  # change the order so that the average plot comes first
+  plots_year_ave <- tail(plots_all, length(dates_to_plot))
+  plots_year_others <- head(plots_all, length(plots_all)-length(dates_to_plot))
+  plots_all <- c(plots_year_ave, plots_year_others)
+  years_to_plot <- c(tail(years_to_plot, 1), head(years_to_plot, length(years_to_plot)-1))
+}
+
+
+rowtitles <- sapply(years_to_plot, function(year) ifelse(year==0, 'Average', year) )
+subplot_width <- 7/6
+subplot_height <- 10/6
+
+if (save_plot) {
+  filename <- file.path(path, 'predictions.pdf')
+  pdf(
+    filename, 
+    height=length(years_to_plot)*subplot_height, 
+    width=length(dates_to_plot)*subplot_width
+  )
+}
+
+subplot(
+  plots_all, 
+  xlabs = '', 
+  ylabs = '', 
+  nrow = length(years_to_plot), 
+  rowtitles = rowtitles,
+  coltitles = dates_to_plot,
+  hspace = 0.005,
+  vspace = 0.005,
+  coltitles.height = 0.15,
+  rowtitles.width = 0.15
+)
+
+if (save_plot) {
+  dev.off()
+}
+
+
+```
+
+
+
+
+
+
+# References {-}
+
+
+
+
+
+
+
