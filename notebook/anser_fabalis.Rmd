@@ -156,9 +156,8 @@ gp <- gp_init(
 ```
 
 
-Optimize the hyperparameters. If you would like to actually run this part (will take some time), set the flag `fit_model = TRUE`. The model fitting is disabled by default to make this notebook compile fast. For plotting the results, we load a prefitted model by default.
-Note: if the program gives a warning that the optimization has not converged, you can simply run this cell again (if will start the optimization from were it ended up previous time).
-```{r, eval=F}
+Optimize the hyperparameters. If you would like to actually run this part (will take some time), set the flag `fit_model = TRUE`. Setting `fit_model = FALSE` skips the model fitting, and attempts to use already fitted (and saved) model for visualization. Note: if the program gives a warning that the optimization has not converged, you can simply run this cell again (if will start the optimization from were it ended up previous time).
+```{r, results='hide', message=F, warning=F}
 fit_model <- F
 if (fit_model) {
   gp <- gp_optim(gp, input, y, trials=n, tol=1e-6)
@@ -166,7 +165,7 @@ if (fit_model) {
 ```
 
 Save the model
-```{r, eval=F}
+```{r}
 if (fit_model) {
   path <- file.path(ROOT, sprintf('notebook/models/%s', SEASON))
   if (!dir.exists(path)) {
