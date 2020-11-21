@@ -31,10 +31,11 @@ knitr::opts_chunk$set(
 
 # Overview
 
-This notebook contains supplementary material for the paper 
+This notebook contains supplementary material for the paper:
 
-_Predicting spatio-temporal distributions of migratory populations by combining citizen science data and Gaussian Process modelling (2020). Antti Piironen, Juho Piironen and Toni Laaksonen._ 
+Predicting spatio-temporal distributions of migratory populations by combining citizen science data and Gaussian Process modelling (2020). Antti Piironen, Juho Piironen and Toni Laaksonen. _Submitted_ 
 
+The codes below show how to repeat the steps for fitting the Gaussian process (GP) model discussed in the paper. Fitting the model using the package `gplite` is very easy, and most of the code below is actually related to manipulating the data and visualizing the results.
 
 
 # Load the data
@@ -195,18 +196,8 @@ gp <- gp_load(filename)
 ```
 
 
-
-```{r}
-
-save_plot <- T
-
-if (save_plot) {
-  # create directory for the plots if not existing yet
-  path <- file.path(ROOT, sprintf('notebook/plots/%s', SEASON))
-  if (!dir.exists(path)) {
-    dir.create(path, recursive = T)
-  }
-}
+Make predictions in different spatial coordinates for different dates across several years.
+```{r, fig.width=7, fig.height=9, results='hide', message=F, warning=F}
 
 ng <- 25 
 x1min <- 19.18 
@@ -354,17 +345,6 @@ if (FLAG_AVERAGE_YEAR %in% years_to_plot) {
 
 
 rowtitles <- sapply(years_to_plot, function(year) ifelse(year==0, 'Average', year) )
-subplot_width <- 7/6
-subplot_height <- 10/6
-
-if (save_plot) {
-  filename <- file.path(path, 'predictions.pdf')
-  pdf(
-    filename, 
-    height=length(years_to_plot)*subplot_height, 
-    width=length(dates_to_plot)*subplot_width
-  )
-}
 
 subplot(
   plots_all, 
@@ -379,10 +359,6 @@ subplot(
   rowtitles.width = 0.15
 )
 
-if (save_plot) {
-  dev.off()
-}
-
 
 ```
 
@@ -391,7 +367,6 @@ if (save_plot) {
 
 
 
-# References {-}
 
 
 
