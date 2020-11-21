@@ -35,7 +35,7 @@ This notebook contains supplementary material for the paper:
 
 Predicting spatio-temporal distributions of migratory populations by combining citizen science data and Gaussian Process modelling (2020). Antti Piironen, Juho Piironen and Toni Laaksonen. _Submitted_ 
 
-The codes below show how to repeat the steps for fitting the Gaussian process (GP) model discussed in the paper. Fitting the model using the package `gplite` is very easy, and most of the code below is actually related to manipulating the data and visualizing the results.
+The codes below show how to repeat the steps for fitting the Gaussian process (GP) model discussed in the paper. Fitting the model using the package [gplite](https://github.com/jpiironen/gplite) is very easy, and most of the code below is actually related to manipulating the data and visualizing the results.
 
 
 # Load the data
