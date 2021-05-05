@@ -91,7 +91,7 @@ This will load the data. Here variable `SEASON` will choose which season is bein
 # load the data
 SEASON <- 'autumn' # 'spring' or 'autumn'
 filename <- 'anser_fabalis_2011-2019.csv'
-dat <- read.csv(file.path(ROOT, 'data/', filename), sep = ',', header=T)
+dat <- read.csv(file.path(ROOT, 'data/', filename), sep = ',', header=TRUE)
 dat$date <- chron(as.character(dat$date), format='d.m.y')
 
 
@@ -121,13 +121,13 @@ colnames(input) <- c('time','x1','x2')
 
 # Fit the model
 
-The code below will specify the model structure. Here we use initial guesses for the hyperparameters that are relatively close to the optimal ones, in order to make the optimization faster. In practice, the optimization should converge also with less accurate initialization, but will take longer time. (Notice though, that it is possible that with a very bad initialization the optimization will not converge, or it converges to some suboptimal local minimum).
+The code below will specify the model structure. Here we use crude but somewhat sensible initial guesses for the hyperparameters. With better initial guess, the optimization would become faster, and as the optimal hyperparameters for the spring and autumn data are quite different, the relative computational times for the two datasets depend heavily on the initialization. Notice also, that it is possible that with a very bad initialization the optimization might converge to some suboptimal local mode.
 ```{r}
 cf_spatial <- cf_nn(
   c('x1','x2'), 
-  magn = 3.7,
-  sigma0 = 4,
-  sigma = 3.5,
+  magn = 1,
+  sigma0 = 1,
+  sigma = 1,
   prior_sigma0 = prior_half_t(1),
   prior_sigma = prior_half_t(1)
 ) 
@@ -137,30 +137,31 @@ cf_temp1 <- cf_periodic(
   prior_period = prior_fixed(),
   cf_base = cf_nn(
     magn = 1, 
-    sigma0 = 0.5,
-    sigma = 5.5,
+    sigma0 = 1,
+    sigma = 1,
     prior_magn = prior_fixed(),
     prior_sigma0 = prior_half_t(1),
     prior_sigma = prior_half_t(1)
   )
 )
-cf_temp2 <- cf_sexp('time', lscale=290, magn=1, prior_magn = prior_fixed())
+cf_temp2 <- cf_sexp('time', lscale=200, magn=1, prior_magn = prior_fixed())
 cf_temporal <- cf_temp1 * cf_temp2
 cfs <- cf_spatial * cf_temporal
+
 gp <- gp_init(
   cfs, 
-  lik = lik_betabinom(phi=5.5), 
+  lik = lik_betabinom(phi=10), 
   method = method_fitc(num_inducing=200, bin_along='time', bin_count=9),
-  approx = approx_laplace()
+  approx = approx_laplace(tol=1e-3)
 )
 ```
 
 
 Optimize the hyperparameters. If you would like to actually run this part (will take some time), set the flag `fit_model = TRUE`. Setting `fit_model = FALSE` skips the model fitting, and attempts to use already fitted (and saved) model for visualization. Note: if the program gives a warning that the optimization has not converged, you can simply run this cell again (if will start the optimization from were it ended up previous time).
-```{r, results='hide', message=F, warning=F}
-fit_model <- F
+```{r, results='hide', message=F, warning=T}
+fit_model <- FALSE
 if (fit_model) {
-  gp <- gp_optim(gp, input, y, trials=n, tol=1e-6)
+  gp <- gp_optim(gp, input, y, trials=n, tol=1e-5, restarts=3)
 }
 ```
 
@@ -169,7 +170,7 @@ Save the model
 if (fit_model) {
   path <- file.path(ROOT, sprintf('notebook/models/%s', SEASON))
   if (!dir.exists(path)) {
-    dir.create(path, recursive = T)
+    dir.create(path, recursive = TRUE)
   }
   filename <- file.path(path, 'gp_la_m=200.rda')
   gp_save(gp, filename)
@@ -223,7 +224,7 @@ plot_index <- 1
 
 for (year in years_all) {
   
-  average_plot <- ifelse(year == FLAG_AVERAGE_YEAR, T, F)
+  average_plot <- ifelse(year == FLAG_AVERAGE_YEAR, TRUE, FALSE)
 
   for (index in seq_along(dates_to_plot)) {
     
@@ -251,7 +252,7 @@ for (year in years_all) {
       signif <- pmax(rowMeans(pr > 0.5), rowMeans(pr < 0.5))
       
       # compute the mean surface
-      pred <- gp_pred(gp, inputnew, transform=T)
+      pred <- gp_pred(gp, inputnew, transform=TRUE)
       pr <- pred$mean
       
       # select which observations to plot
