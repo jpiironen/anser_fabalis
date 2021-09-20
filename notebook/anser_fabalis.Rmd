@@ -1,5 +1,5 @@
 ---
-title: "Case study on migration of _Anser Fabalis_"
+title: " Case study on migration of taiga bean goose _Anser fabalis fabalis_"
 date: "`r Sys.Date()`"
 #bibliography: ../references.bib
 link-citations: yes
@@ -33,9 +33,9 @@ knitr::opts_chunk$set(
 
 This notebook contains supplementary material for the paper:
 
-Predicting spatio-temporal distributions of migratory populations by combining citizen science data and Gaussian Process modelling (2020). Antti Piironen, Juho Piironen and Toni Laaksonen. _Submitted_ 
+Predicting spatio-temporal distributions of migratory populations using Gaussian Process modelling (2020). Antti Piironen, Juho Piironen and Toni Laaksonen. _Submitted_
 
-The codes below show how to repeat the steps for fitting the Gaussian process (GP) model discussed in the paper. Fitting the model using the package [gplite](https://github.com/jpiironen/gplite) is very easy, and most of the code below is actually related to manipulating the data and visualizing the results.
+The codes below show how to repeat the steps for fitting the Gaussian process (GP) model discussed in the paper. Fitting the model using the package [gplite](https://github.com/jpiironen/gplite) is very easy, and most of the code below is actually related to manipulating the data and visualizing the results. For more generic examples about how to use the package, see [gplite quickstart](https://jpiironen.github.io/material/gplite/quickstart.html).
 
 
 # Load the data
@@ -121,7 +121,11 @@ colnames(input) <- c('time','x1','x2')
 
 # Fit the model
 
-The code below will specify the model structure. Here we use crude but somewhat sensible initial guesses for the hyperparameters. With better initial guess, the optimization would become faster, and as the optimal hyperparameters for the spring and autumn data are quite different, the relative computational times for the two datasets depend heavily on the initialization. Notice also, that it is possible that with a very bad initialization the optimization might converge to some suboptimal local mode.
+The code below will specify the model structure. See the paper for discussion about why this particular structure was chosen. A small detail to notice in the code below, is that since the kernel is a product of three individual kernels, we fix the magnitude hyperparameters `magn` to one for two of the kernels (using `prior_magn=prior_fixed()`) and optimize only one of them (the one in `cf_spatial`). Otherwise the kernel would have a product of three magnitude hyperparameters, so their values would become unidentifiable.
+
+We also use crude but somewhat sensible initial guesses for the hyperparameters. With better initial guess, the optimization would become faster, and as the optimal hyperparameters for the spring and autumn data are quite different, the relative computational times for the two datasets depend heavily on the initialization. Notice also, that it is possible that with a very bad initialization the optimization might converge to some suboptimal local mode.
+
+
 ```{r}
 cf_spatial <- cf_nn(
   c('x1','x2'), 
