@@ -33,7 +33,7 @@ knitr::opts_chunk$set(
 
 This notebook contains supplementary material for the paper:
 
-Predicting spatio-temporal distributions of migratory populations using Gaussian Process modelling (2020). Antti Piironen, Juho Piironen and Toni Laaksonen. _Submitted_
+Predicting spatio-temporal distributions of migratory populations using Gaussian process modelling (2021). Antti Piironen, Juho Piironen and Toni Laaksonen. _Journal of Applied Ecology_, accepted for publication.
 
 The codes below show how to repeat the steps for fitting the Gaussian process (GP) model discussed in the paper. Fitting the model using the package [gplite](https://github.com/jpiironen/gplite) is very easy, and most of the code below is actually related to manipulating the data and visualizing the results. For more generic examples about how to use the package, see [gplite quickstart](https://jpiironen.github.io/material/gplite/quickstart.html).
 

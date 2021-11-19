@@ -2,7 +2,7 @@
 
 This repository contains the supplementary material (data and example codes) for the paper
 
-Predicting spatio-temporal distributions of migratory populations using Gaussian process modelling (2020). Antti Piironen, Juho Piironen and Toni Laaksonen. _Submitted_
+Predicting spatio-temporal distributions of migratory populations using Gaussian process modelling (2021). Antti Piironen, Juho Piironen and Toni Laaksonen. _Journal of Applied Ecology_, accepted for publication.
 
 The codes can be found from the `notebook` directory. Here are the links to the relevant html-versions, which can be viewed directly in browser:
 
