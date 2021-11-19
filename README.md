@@ -1,4 +1,4 @@
-# Case study on migration of _anser fabalis_
+# Case study on migration of _Anser fabalis fabalis_
 
 This repository contains the supplementary material (data and example codes) for the paper
 
