@@ -1,8 +1,8 @@
 # Case study on migration of _Anser fabalis fabalis_
 
-This repository contains the supplementary material (data and example codes) for the paper
+This repository contains supplementary material (data and example codes) for the paper
 
-Predicting spatio-temporal distributions of migratory populations using Gaussian process modelling (2021). Antti Piironen, Juho Piironen and Toni Laaksonen. _Journal of Applied Ecology_, accepted for publication.
+* Predicting spatio-temporal distributions of migratory populations using Gaussian process modelling (2022). Antti Piironen, Juho Piironen and Toni Laaksonen. _Journal of Applied Ecology_, 00: 1-11. [Online](https://doi.org/10.1111/1365-2664.14127)
 
 The codes can be found from the `notebook` directory. Here are the links to the relevant html-versions, which can be viewed directly in browser:
 
